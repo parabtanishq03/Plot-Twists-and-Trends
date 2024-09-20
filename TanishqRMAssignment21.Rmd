@@ -1,0 +1,143 @@
+---
+title: "Movies Dataset Analysis"
+output: html_notebook
+---
+
+```{r}
+#importing the necessary libraries
+library(ggplot2)
+library(DT)
+library(ggthemes)
+library(summarytools)
+library(corrplot)
+library(lubridate)
+library(tidyverse)
+
+```
+
+```{r}
+#loading the dataset
+movies_data = read.csv("movies.csv")
+
+```
+
+```{r}
+# 2. Overview of the dataset
+str(movies_data)
+summary(movies_data)
+head(movies_data)
+glimpse(movies_data)
+```
+
+```{r}
+# Removing less necessary columns
+movies = movies_data[, -c(1,11,12,16,23)]
+```
+
+```{r}
+# 3. Check for missing values
+missing_values = sapply(movies, function(x) sum(is.na(x)))
+
+datatable(data.frame(Column = names(movies), MissingValues = missing_values),
+          options = list(pageLength = 5), 
+          caption = "Missing values in each column")
+```
+
+```{r}
+# 4. Handle missing values in runtime column
+movies$runtime[is.na(movies$runtime)] <- median(movies$runtime, na.rm = TRUE)
+```
+
+```{r}
+# 5. Descriptive Statistics
+# Summary statistics for numerical columns
+num_cols = sapply(movies, is.numeric)
+summary(movies[, num_cols])
+```
+
+```{r}
+# Detailed descriptive statistics with summarytools
+descr(movies[, num_cols], stats = "all")
+```
+
+```{r}
+# 6. Graphical Analysis
+# Histogram for budget
+ggplot(movies, aes(x = budget)) +
+  geom_histogram(binwidth = 10000000, fill = "blue", color = "black", alpha = 0.7) +
+  scale_x_continuous(labels = scales::comma_format()) +
+  theme_minimal() +
+  labs(title = "Distribution of Movie Budgets", x = "Budget", y = "Frequency")
+```
+
+```{r}
+# Boxplot for runtime
+ggplot(movies, aes(y = runtime)) +
+  geom_boxplot(fill = "orange", color = "black", alpha = 0.7) +
+  theme_minimal() +
+  labs(title = "Boxplot of Movie Runtime", y = "Runtime (minutes)")
+```
+
+```{r}
+# Bar plot for original language
+ggplot(movies, aes(x = original_language)) +
+  geom_bar(fill = "lightgreen", color = "black", alpha = 0.7) +
+  theme_minimal() +
+  labs(title = "Number of Movies per Language", x = "Language", y = "Count") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+```{r}
+# Scatter plot for budget vs revenue
+ggplot(movies, aes(x = budget, y = revenue)) +
+  geom_point(color = "blue", alpha = 0.5) +
+  theme_minimal() +
+  labs(title = "Budget vs. Revenue", x = "Budget", y = "Revenue") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+```{r}
+# Correlation plot for numerical columns
+cor_matrix <- cor(movies[, num_cols], use = "complete.obs")
+corrplot::corrplot(cor_matrix, method = "circle")
+```
+
+```{r}
+# 7. Additional Visualizations
+# Top 10 movies by popularity
+top_movies <- movies %>%
+  arrange(desc(popularity)) %>%
+  head(10)
+
+ggplot(top_movies, aes(x = reorder(original_title, popularity), y = popularity)) +
+  geom_bar(stat = "identity", fill = "purple", color = "black", alpha = 0.7) +
+  coord_flip() +
+  theme_minimal() +
+  labs(title = "Top 10 Movies by Popularity", x = "Movie Title", y = "Popularity") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+```{r}
+#Time Series Analysis
+# Convert release_date to Date type and extract year
+movies = movies %>%
+  mutate(release_year = year(ymd(release_date)))
+
+# Aggregate data by year (e.g., average budget, average revenue)
+yearly_data = movies %>%
+  group_by(release_year) %>%
+  summarise(
+    avg_budget = mean(budget, na.rm = TRUE),
+    avg_revenue = mean(revenue, na.rm = TRUE),
+    movie_count = n()
+  )
+
+# Plot average budget and revenue over time
+ggplot(yearly_data, aes(x = release_year)) +
+  geom_line(aes(y = avg_budget, color = "Average Budget"), size = 1) +
+  geom_line(aes(y = avg_revenue, color = "Average Revenue"), size = 1) +
+  scale_y_continuous(labels = scales::comma_format()) +
+  labs(title = "Trends in Average Budget and Revenue Over Time", x = "Year", y = "Amount") +
+  theme_minimal() +
+  scale_color_manual(values = c("Average Budget" = "blue", "Average Revenue" = "red"))
+```
